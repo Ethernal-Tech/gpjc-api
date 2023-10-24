@@ -1,0 +1,4 @@
+[submodule "private-join-and-compute"]
+	path = private-join-and-compute
+	url = https://github.com/Ethernal-Tech/private-join-and-compute.git
+	branch = master
