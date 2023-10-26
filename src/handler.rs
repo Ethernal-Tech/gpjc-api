@@ -175,9 +175,11 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
             return;
         }
 
+        let sliced_text: Vec<&str> = resp.data.split(',').collect();
+
         let mut map = HashMap::new();
         map.insert("TransactionId", request_data.tx_id.clone());
-        map.insert("Value", resp.data);
+        map.insert("Value", sliced_text[0].to_string());
 
         let client = reqwest::Client::new();
         let _res = client

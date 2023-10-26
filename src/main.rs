@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
             .service(handler::start_server_process)
             .service(handler::get_proof)
     })
-    .bind((args[1].as_str(), 8080))?
+    .bind((args[1].as_str(), 9090))?
     .run()
     .await
 }
