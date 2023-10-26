@@ -20,6 +20,8 @@ fn set_env() {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+
     env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
 
@@ -40,7 +42,7 @@ async fn main() -> std::io::Result<()> {
             .service(handler::start_server_process)
             .service(handler::get_proof)
     })
-    .bind(("0.0.0.0", 9090))?
+    .bind((args[1].as_str(), 8080))?
     .run()
     .await
 }

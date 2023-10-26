@@ -1,5 +1,5 @@
 run:
-	cargo run --bin gpjc-api
+	cargo run --bin gpjc-api -- localhost
 
 build:
 	$(MAKE) -C private-join-and-compute
