@@ -16,10 +16,26 @@ make build
 ```
 Using this command will build both the private-join-and-compute protocol and the Rust API code.
 
-After this you can start API with:
+After this you can start API. Depending on your operating system you will use:
 ```bash
-make run
+make run-linux password='<your-mssql-password>'
 ```
+or
+```bash
+make run-windows
+```
+
+These commands will start gpjc server on local machine(localhost).
+
+To run the program with different address for gpjc server use:
+```bash
+cargo run --bin gpjc-api -- <address>
+```
+For windows, or:
+```bash
+cargo run --bin gpjc-api -- <address> <your-mssql-password>
+```
+for linux based systems.
 
 To test out methods you can use(be aware of key duplication when running these commands):
 - Start gpjc server:

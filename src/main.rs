@@ -4,7 +4,7 @@ extern crate actix_web;
 use std::env;
 
 use actix_cors::Cors;
-use actix_web::{middleware, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 
 mod constants;
 mod db;
@@ -21,19 +21,38 @@ fn set_env() {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
+    #[allow(unused)]
+    let mut mssql_password = "".to_string();
+
+    #[cfg(target_os = "linux")]
+    {
+        if args.len() != 3 {
+            println!("Command line argument missing: Expected <address> and <mssql-password>");
+            return Ok(());
+        }
+        mssql_password = args[2].clone();
+    }
+
+    if args.len() < 2 {
+        println!("Command line argument missing: Address for running the gpjc server is missing, 
+                  consider running the program with Makefile command run.
+                  Check the README.md file in case you want to use different address for gpjc server.");
+        return Ok(());
+    }
 
     env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
 
     set_env();
 
-    match db::execute_query(db::Query::CreateTable, Vec::new()) {
+    match db::execute_query(mssql_password.clone(), db::Query::CreateTable, Vec::new()) {
         Ok(_) => println!("Table created"),
         Err(err) => println!("Error {err}"),
     }
 
     HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(mssql_password.clone()))
             .wrap(Cors::permissive())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())

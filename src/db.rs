@@ -24,20 +24,27 @@ pub enum Query {
 /// # GetLog
 /// TransactionId
 pub fn execute_query(
+    mssql_password: String,
     query: Query,
     params: Vec<String>,
 ) -> Result<Option<LogEntry>, DiagnosticRecord> {
     let env = create_environment_v3().map_err(|e| e.unwrap())?;
 
-    let connection_string = "Driver={ODBC Driver 18 for SQL Server};\
-    Server=0.0.0.0;\
-    UID=SA;\
-    PWD=Ethernal!123;TrustServerCertificate=Yes;Database=gpjc_data;";
+    #[cfg(target_os = "linux")]
+    let connection_string = format!(
+        "Driver={{ODBC Driver 18 for SQL Server}};\
+        Server=0.0.0.0;\
+        UID=SA;\
+        PWD={};\
+        TrustServerCertificate=Yes;Database=gpjc_data;",
+        mssql_password
+    );
 
-    #[cfg(feature = "windows-build")]
+    #[cfg(target_os = "windows")]
     let connection_string = "Driver={ODBC Driver 18 for SQL Server};\
-    Server=localhost:1434;\
-    TrustedConnection=Yes;Database=gpjc_data;";
+        Server=localhost:1434;\
+        TrustedConnection=Yes;\
+        Database=gpjc_data;";
 
     let conn = env.connect_with_connection_string(&connection_string)?;
     execute_statement(&conn, query, params)

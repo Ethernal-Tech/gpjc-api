@@ -4,7 +4,7 @@ use std::fs;
 use std::process::Command;
 use std::str::FromStr;
 
-use actix_web::web::Json;
+use actix_web::web::{self, Json};
 use actix_web::{get, post, HttpResponse, Responder};
 use csv::Writer;
 
@@ -38,6 +38,7 @@ fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[allow(unused)]
 pub fn start_client(transaction_id: i32, destination_address: String) -> Response {
     let client_csv_path = get_path("UN_test.csv");
 
@@ -98,9 +99,9 @@ pub fn start_client(transaction_id: i32, destination_address: String) -> Respons
     }
 }
 
-pub fn start_server(transaction_id: String) -> Response {
+pub fn start_server(mssql_password: web::Data<String>, transaction_id: String) -> Response {
     let params = vec![transaction_id.clone(), "0".to_string()];
-    match db::execute_query(db::Query::InsertLog, params) {
+    match db::execute_query(mssql_password.to_string(), db::Query::InsertLog, params) {
         Ok(_) => println!("Entered log in db"),
         Err(err) => println!("Insert into gpjc_logs failed with error: {err}"),
     };
@@ -123,7 +124,7 @@ pub fn start_server(transaction_id: String) -> Response {
                     sliced_text[1].to_string(), // TODO: Update GPJC for proof parsing
                     transaction_id,
                 ];
-                match db::execute_query(db::Query::UpdateLog, params) {
+                match db::execute_query(mssql_password.to_string(), db::Query::UpdateLog, params) {
                     Ok(_) => println!("Updated log in db"),
                     Err(err) => println!("Insert into gpjc_logs failed with error: {err}"),
                 };
@@ -166,9 +167,12 @@ pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> imp
 }
 
 #[post("/api/start-server")]
-pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> impl Responder {
+pub async fn start_server_process(
+    mssql_password: web::Data<String>,
+    request_data: Json<ServerStartRequest>,
+) -> impl Responder {
     tokio::spawn(async move {
-        let resp = start_server(request_data.tx_id.clone());
+        let resp = start_server(mssql_password, request_data.tx_id.clone());
         if resp.exit_code != 0 {
             println!("ERROR: GPJC failed with error: {}", resp.data);
             return;
@@ -192,9 +196,12 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
 }
 
 #[get("/api/proof")]
-pub async fn get_proof(request_data: Json<ProofRequest>) -> impl Responder {
+pub async fn get_proof(
+    mssql_password: web::Data<String>,
+    request_data: Json<ProofRequest>,
+) -> impl Responder {
     let params = vec![FromStr::from_str(request_data.tx_id.as_str()).unwrap()];
-    match db::execute_query(db::Query::GetLog, params) {
+    match db::execute_query(mssql_password.to_string(), db::Query::GetLog, params) {
         Ok(val) => match val {
             Some(resp) => return HttpResponse::Ok().content_type(APPLICATION_JSON).json(resp),
             None => {
