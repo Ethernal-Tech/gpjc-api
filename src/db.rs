@@ -32,8 +32,12 @@ pub fn execute_query(
     let connection_string = "Driver={ODBC Driver 18 for SQL Server};\
     Server=0.0.0.0;\
     UID=SA;\
-    PWD=Ethernal!123;TrustServerCertificate=Yes;Database=gpjc_data;\
-    ";
+    PWD=Ethernal!123;TrustServerCertificate=Yes;Database=gpjc_data;";
+
+    #[cfg(feature = "windows-build")]
+    let connection_string = "Driver={ODBC Driver 18 for SQL Server};\
+    Server=localhost:1434;\
+    TrustedConnection=Yes;Database=gpjc_data;";
 
     let conn = env.connect_with_connection_string(&connection_string)?;
     execute_statement(&conn, query, params)

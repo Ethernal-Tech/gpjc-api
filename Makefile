@@ -8,8 +8,8 @@ build:
 release:
 	cargo build --release
 	rustup target add x86_64-pc-windows-gnu
-	cargo build --target x86_64-pc-windows-gnu --release
+	cargo build --target x86_64-pc-windows-gnu --release --features=windows-build
 
 release-multiple-machines:
 	cargo build --release --features=client
-	cargo build --target x86_64-pc-windows-gnu --release --features=client
+	cargo build --target x86_64-pc-windows-gnu --release --features=client, windows-build
