@@ -5,6 +5,10 @@ build:
 	$(MAKE) -C private-join-and-compute
 	cargo build --bin gpjc-api
 
+clean:
+	rm -rf Cargo.lock
+	cargo clean
+
 release:
 	cargo build --release
 	rustup target add x86_64-pc-windows-gnu
