@@ -38,7 +38,6 @@ fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// RELEASE: remove _ in front of transaction_id
 pub fn start_client(transaction_id: i32, destination_address: String) -> Response {
     let client_csv_path = get_path("UN_test.csv");
 
