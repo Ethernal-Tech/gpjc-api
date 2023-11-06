@@ -2,13 +2,20 @@
 
 Rust wrapper API for using fork of google/private-join-and-compute protocol.
 
-## How to run the API:
+## Before running the API:
 
 In order to run Private Join and Compute, you need to install Bazel, if you
 don't have it already.
 [Follow the instructions for your platform on the Bazel website.](https://docs.bazel.build/versions/master/install.html)
 
-Rust API is using MSSQL database, before running you need to create **gpjc_data** database.
+In order to run API, you need to install Rust, if you don't have it already.
+[To install Rust follow instructions from this website.](https://www.rust-lang.org/tools/install)
+
+Rust API is using MSSQL database, before running you need to install MSSSQL server if you don't have it already.[Follow the instructions for your platform on the Microsoft webiste.](https://learn.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server?view=sql-server-ver16) When MSSQL server is installed create **gpjc_data** database.
+
+For ease of use, Makefile is used for building and running the application. If you don't have it already you can install it following instructions from [this webiste for Windows](https://gnuwin32.sourceforge.net/packages/make.htm), or [from this webiste for Linux based systems](https://www.gnu.org/software/make/).
+
+## How to run the API:
 
 First build the project using:
 ```bash
@@ -27,15 +34,14 @@ make run-windows
 
 These commands will start gpjc server on local machine(localhost).
 
-To run the program with different address for gpjc server use:
+To run the program with different address(not the localhost) for gpjc server for Windows use:
 ```bash
 cargo run --bin gpjc-api -- <address>
 ```
-For windows, or:
+For Linux based systems:
 ```bash
 cargo run --bin gpjc-api -- <address> <your-mssql-password>
 ```
-for linux based systems.
 
 To test out methods you can use(be aware of key duplication when running these commands):
 - Start gpjc server:
