@@ -49,7 +49,6 @@ pub fn start_client(transaction_id: i32, destination_address: String) -> Respons
         .unwrap();
 
     // Feature not used for testing on local machine
-    // Include for RELEASE build
     #[cfg(feature = "client")]
     {
         let params = vec![transaction_id.to_string(), "1".to_string()];
@@ -121,7 +120,7 @@ pub fn start_server(mssql_password: web::Data<String>, transaction_id: String) -
 
                 let params = vec![
                     sliced_text[0].to_string(),
-                    sliced_text[1].to_string(), // TODO: Update GPJC for proof parsing
+                    sliced_text[1].to_string(),
                     transaction_id,
                 ];
                 match db::execute_query(mssql_password.to_string(), db::Query::UpdateLog, params) {
