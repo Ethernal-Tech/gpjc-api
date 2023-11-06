@@ -11,7 +11,9 @@ don't have it already.
 In order to run API, you need to install Rust, if you don't have it already.
 [To install Rust follow instructions from this website.](https://www.rust-lang.org/tools/install)
 
-Rust API is using MSSQL database, before running you need to install MSSSQL server if you don't have it already.[Follow the instructions for your platform on the Microsoft webiste.](https://learn.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server?view=sql-server-ver16) When MSSQL server is installed create **gpjc_data** database.
+Rust API is using MSSQL database, before running you need to install MSSSQL server if you don't have it already.
+[Follow the instructions for your platform on the Microsoft webiste.](https://learn.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server?view=sql-server-ver16) 
+When MSSQL server is installed create **gpjc_data** database.
 
 For ease of use, Makefile is used for building and running the application. If you don't have it already you can install it following instructions from [this webiste for Windows](https://gnuwin32.sourceforge.net/packages/make.htm), or [from this webiste for Linux based systems](https://www.gnu.org/software/make/).
 
