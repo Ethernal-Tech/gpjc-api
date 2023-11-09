@@ -39,7 +39,11 @@ fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
 }
 
 #[allow(unused)]
-pub fn start_client(transaction_id: i32, destination_address: String) -> Response {
+pub fn start_client(
+    mssql_password: web::Data<String>,
+    transaction_id: i32,
+    destination_address: String,
+) -> Response {
     let client_csv_path = get_path("UN_test.csv");
 
     let output = Command::new("bazel-bin/private_join_and_compute/client")
@@ -49,10 +53,10 @@ pub fn start_client(transaction_id: i32, destination_address: String) -> Respons
         .unwrap();
 
     // Feature not used for testing on local machine
-    #[cfg(feature = "client")]
+    #[cfg(feature = "multiple-machines")]
     {
         let params = vec![transaction_id.to_string(), "1".to_string()];
-        match db::execute_query(db::Query::InsertLog, params) {
+        match db::execute_query(mssql_password.to_string(), db::Query::InsertLog, params) {
             Ok(_) => println!("Entered log in db"),
             Err(err) => println!("Insert into gpjc_logs failed with error: {err}"),
         };
@@ -61,7 +65,7 @@ pub fn start_client(transaction_id: i32, destination_address: String) -> Respons
         Some(code) => {
             if code == 0 {
                 let output_text = String::from_utf8_lossy(&output.stdout).into_owned();
-                #[cfg(feature = "client")]
+                #[cfg(feature = "multiple-machines")]
                 {
                     let sliced_text: Vec<&str> = output_text.split(',').collect();
 
@@ -70,7 +74,11 @@ pub fn start_client(transaction_id: i32, destination_address: String) -> Respons
                         sliced_text[1].to_string(),
                         transaction_id.to_string(),
                     ];
-                    match db::execute_query(db::Query::UpdateLog, params) {
+                    match db::execute_query(
+                        mssql_password.to_string(),
+                        db::Query::UpdateLog,
+                        params,
+                    ) {
                         Ok(_) => println!("Updated log in db"),
                         Err(err) => println!("Insert into gpjc_logs failed with error: {err}"),
                     };
@@ -149,11 +157,15 @@ pub fn start_server(mssql_password: web::Data<String>, transaction_id: String) -
 }
 
 #[post("/api/start-client")]
-pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> impl Responder {
+pub async fn start_client_process(
+    mssql_password: web::Data<String>,
+    request_data: Json<ClientStartRequest>,
+) -> impl Responder {
     tokio::spawn(async move {
         match create_csv(request_data.receiver.clone()) {
             Ok(()) => {
                 let _resp = start_client(
+                    mssql_password,
                     FromStr::from_str(request_data.tx_id.as_str()).unwrap(),
                     request_data.to.clone(),
                 );

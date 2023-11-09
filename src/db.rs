@@ -23,6 +23,7 @@ pub enum Query {
 /// Result, Proof, TransactionId
 /// # GetLog
 /// TransactionId
+#[allow(unused)]
 pub fn execute_query(
     mssql_password: String,
     query: Query,

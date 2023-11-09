@@ -18,6 +18,6 @@ release:
 	cargo build --target x86_64-pc-windows-gnu --release
 
 release-multiple-machines:
-	cargo build --release --features=client
+	cargo build --release --features=multiple-machines
 	rustup target add x86_64-pc-windows-gnu
-	cargo build --target x86_64-pc-windows-gnu --release --features=client
+	cargo build --target x86_64-pc-windows-gnu --release --features=multiple-machines
