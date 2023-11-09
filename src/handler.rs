@@ -181,6 +181,7 @@ pub async fn start_server_process(
 
         let mut map = HashMap::new();
         map.insert("TransactionId", request_data.tx_id.clone());
+        map.insert("PolicyId", request_data.policy_id.clone());
         map.insert("Value", sliced_text[0].to_string());
 
         let client = reqwest::Client::new();
