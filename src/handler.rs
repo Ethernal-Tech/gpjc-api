@@ -197,8 +197,13 @@ pub async fn start_server_process(
         map.insert("Value", sliced_text[0].to_string());
 
         let client = reqwest::Client::new();
+        let intermediary_address =
+            std::env::var("INTERMEDIARY").expect("MAILCOACH_API_TOKEN must be set.");
         let _res = client
-            .post("http://localhost:4000/api/submitTransactionProof")
+            .post(format!(
+                "http://{}/api/submitTransactionProof",
+                intermediary_address
+            ))
             .json(&map)
             .send()
             .await;

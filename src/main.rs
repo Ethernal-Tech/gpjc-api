@@ -1,10 +1,10 @@
 // #[macro_use]
 extern crate actix_web;
 
-use std::env;
-
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
+use dotenv::dotenv;
+use std::env;
 
 mod constants;
 mod db;
@@ -40,6 +40,7 @@ async fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
+    dotenv().ok();
     env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
 
