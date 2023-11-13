@@ -47,8 +47,8 @@ pub fn start_client(
     let client_csv_path = get_path("UN_test.csv");
 
     let output = Command::new("bazel-bin/private_join_and_compute/client")
-        .arg(format!("--client_data_file={client_csv_path}",))
-        .arg(format!(" --port={destination_address}"))
+        .arg(format!("--client_data_file={client_csv_path}"))
+        .arg(format!("--port={destination_address}"))
         .output()
         .unwrap();
 
@@ -114,9 +114,11 @@ pub fn start_server(mssql_password: web::Data<String>, transaction_id: String) -
     };
 
     let server_csv_path = get_path("UN_List.csv");
+    let dns_name = std::env::var("DNS_NAME").expect("DNS_NAME in .env file must be set.");
 
     let output = Command::new("bazel-bin/private_join_and_compute/server")
-        .arg(format!("--server_data_file={}", server_csv_path))
+        .arg(format!("--server_data_file={server_csv_path}"))
+        .arg(format!("--port={dns_name}:10501"))
         .output()
         .unwrap();
 
@@ -150,7 +152,7 @@ pub fn start_server(mssql_password: web::Data<String>, transaction_id: String) -
         None => {
             return Response {
                 exit_code: 1,
-                data: "Error in server execution".to_string(),
+                data: format!("Error in gpjc server execution"),
             }
         }
     }
@@ -198,7 +200,7 @@ pub async fn start_server_process(
 
         let client = reqwest::Client::new();
         let intermediary_address =
-            std::env::var("INTERMEDIARY").expect("MAILCOACH_API_TOKEN must be set.");
+            std::env::var("INTERMEDIARY").expect("INTERMEDIARY in .env file must be set.");
         let _res = client
             .post(format!(
                 "http://{}/api/submitTransactionProof",

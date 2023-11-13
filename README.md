@@ -43,6 +43,7 @@ In case of running the program on multiple machines:
 
 1. Use different version of [google/private-join-and-compute](https://github.com/Ethernal-Tech/private-join-and-compute/tree/multiple-machines) intended for use on different machines
 2. Edit `.env` file and set `INTERMEDIARY` value to your intermediary server address
+3. Edit `.env` file and set `DNS_NAME` value to DNS name of the machine that runs it (for example client1.ethernal.com) 
 
 To run the program with different address(not the localhost) for gpjc server for Windows use:
 ```bash
