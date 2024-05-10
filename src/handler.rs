@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs;
+use std::fs::{self, File};
 use std::process::Command;
 use std::str::FromStr;
 
@@ -18,17 +18,20 @@ fn get_path(file_name: &str) -> String {
     let sanctions_dir_path =
         current_dir_path.replace("private-join-and-compute", "") + "sanction-lists/";
 
-    let paths = fs::read_dir(sanctions_dir_path)
+    let paths = fs::read_dir(&sanctions_dir_path)
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.path().to_string_lossy().into_owned())
         .collect::<Vec<_>>();
 
-    paths
-        .iter()
-        .find(|&x| x.contains(file_name))
-        .unwrap()
-        .to_string()
+    match paths.iter().find(|&x| x.contains(file_name)) {
+        Some(path) => return path.to_string(),
+        None => {
+            let path = format!("{}/{}", sanctions_dir_path, file_name);
+            File::create(&path).unwrap();
+            return path;
+        }
+    }
 }
 
 fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
