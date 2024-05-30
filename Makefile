@@ -12,6 +12,12 @@ clean:
 	rm -rf Cargo.lock
 	cargo clean
 
+clippy-check:
+	cargo clippy --workspace -- -D warnings
+
+lint:
+	cargo fmt --all
+
 release:
 	cargo build --release
 	rustup target add x86_64-pc-windows-gnu
