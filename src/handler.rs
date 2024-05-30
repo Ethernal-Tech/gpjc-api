@@ -117,6 +117,7 @@ pub async fn start_client_process(
     request_data: Json<ClientStartRequest>,
 ) -> impl Responder {
     tokio::spawn(async move {
+        #[allow(unused)]
         let mut resp: Option<Response> = None;
         match create_csv(request_data.receiver.clone()) {
             Ok(()) => {
