@@ -1,5 +1,5 @@
 run-linux:
-	cargo run --bin gpjc-api -- localhost $(password)
+	cargo run --bin gpjc-api -- localhost
 
 run-windows:
 	cargo run --bin gpjc-api -- localhost
