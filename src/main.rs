@@ -2,7 +2,7 @@
 extern crate actix_web;
 
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
 use std::env;
 
@@ -19,17 +19,6 @@ fn set_env() {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    #[allow(unused)]
-    let mut mssql_password = "".to_string();
-
-    #[cfg(target_os = "linux")]
-    {
-        if args.len() != 3 {
-            println!("Command line argument missing: Expected <address> and <mssql-password>");
-            return Ok(());
-        }
-        mssql_password = args[2].clone();
-    }
 
     if args.len() < 2 {
         println!("Command line argument missing: Address for running the gpjc server is missing, 
@@ -46,7 +35,6 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(mssql_password.clone()))
             .wrap(Cors::permissive())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())

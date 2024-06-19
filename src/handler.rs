@@ -1,10 +1,13 @@
+use ed25519_dalek::{PublicKey, Signature, Verifier};
+use hex::FromHex;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::Path;
 use std::process::Command;
-use std::str::FromStr;
 
-use actix_web::web::{self, Json};
+use actix_web::web::Json;
 use actix_web::{post, HttpResponse, Responder};
 use csv::Writer;
 
@@ -40,11 +43,7 @@ fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
 }
 
 #[allow(unused)]
-pub fn start_client(
-    mssql_password: web::Data<String>,
-    transaction_id: i32,
-    destination_address: String,
-) -> Response {
+pub fn start_client(destination_address: String) -> Response {
     let client_csv_path = get_path("UN_test.csv");
 
     let output = Command::new("bazel-bin/private_join_and_compute/client")
@@ -112,20 +111,13 @@ pub fn start_server() -> Response {
 }
 
 #[post("/api/start-client")]
-pub async fn start_client_process(
-    mssql_password: web::Data<String>,
-    request_data: Json<ClientStartRequest>,
-) -> impl Responder {
+pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> impl Responder {
     tokio::spawn(async move {
         #[allow(unused)]
         let mut resp: Option<Response> = None;
         match create_csv(request_data.receiver.clone()) {
             Ok(()) => {
-                resp = Some(start_client(
-                    mssql_password,
-                    FromStr::from_str(request_data.tx_id.as_str()).unwrap(),
-                    request_data.to.clone(),
-                ));
+                resp = Some(start_client(request_data.to.clone()));
 
                 if resp.is_some() {
                     if resp.as_ref().unwrap().exit_code != 0 {
@@ -146,11 +138,44 @@ pub async fn start_client_process(
         #[cfg(feature = "multiple-machines")]
         {
             if let Some(response) = resp {
-                let sliced_text: Vec<&str> = response.data.split(',').collect();
+                match read_public_key_from_file("pub_key.txt") {
+                    Ok(bytes) => {
+                        println!("Public key in bytes: {:?}", bytes);
+                        let public_key = PublicKey::from_bytes(&bytes).unwrap();
+
+                        println!("{:?}", response.data);
+                        // res;signature;signed_msg
+                        let resp_parts: Vec<&str> = response.data.split(";").collect();
+
+                        let signature_bytes = Vec::from_hex(resp_parts[1])
+                            .map_err(|e| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    format!("Invalid hex string: {}", e),
+                                )
+                            })
+                            .unwrap();
+
+                        let signature = Signature::from_bytes(&signature_bytes).unwrap();
+
+                        if public_key
+                            .verify(resp_parts[2].to_string().as_bytes(), &signature)
+                            .is_ok()
+                        {
+                            println!("Signature is valid");
+                        } else {
+                            println!("Signature not valid");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error reading public key: {}", e);
+                    }
+                }
+
                 notify_caller(
                     request_data.tx_id.clone(),
                     request_data.policy_id.to_string(),
-                    sliced_text[0].to_string(),
+                    response.data.to_string(),
                 )
                 .await;
             }
@@ -169,11 +194,44 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
             return;
         }
 
-        let sliced_text: Vec<&str> = resp.data.split(',').collect();
+        match read_public_key_from_file("pub_key.txt") {
+            Ok(bytes) => {
+                println!("Public key in bytes: {:?}", bytes);
+                let public_key = PublicKey::from_bytes(&bytes).unwrap();
+
+                println!("{:?}", resp.data);
+                // res;signature;signed_msg
+                let resp_parts: Vec<&str> = resp.data.split(";").collect();
+
+                let signature_bytes = Vec::from_hex(resp_parts[1])
+                    .map_err(|e| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("Invalid hex string: {}", e),
+                        )
+                    })
+                    .unwrap();
+
+                let signature = Signature::from_bytes(&signature_bytes).unwrap();
+
+                if public_key
+                    .verify(resp_parts[2].to_string().as_bytes(), &signature)
+                    .is_ok()
+                {
+                    println!("Signature is valid");
+                } else {
+                    println!("Signature not valid");
+                }
+            }
+            Err(e) => {
+                eprintln!("Error reading public key: {}", e);
+            }
+        }
+
         notify_caller(
             request_data.tx_id.clone(),
             request_data.policy_id.clone(),
-            sliced_text[0].to_string(),
+            resp.data.to_string(),
         )
         .await;
     });
@@ -195,4 +253,36 @@ async fn notify_caller(tx_id: String, policy_id: String, resulting_value: String
         .json(&map)
         .send()
         .await;
+}
+
+/// Reads a hex-encoded public key from a .txt file and converts it to bytes.
+///
+/// # Arguments
+///
+/// * `file_path` - A string slice that holds the path to the .txt file.
+///
+/// # Returns
+///
+/// * A Result containing a vector of bytes if successful, or an io::Error.
+fn read_public_key_from_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
+    // Open the file in read-only mode (ignoring errors).
+    let path = Path::new(file_path);
+    let mut file = File::open(&path)?;
+
+    // Read the file contents into a string.
+    let mut hex_string = String::new();
+    file.read_to_string(&mut hex_string)?;
+
+    // Remove any whitespace or newline characters.
+    let hex_string = hex_string.trim();
+
+    // Convert the hex string to bytes.
+    let bytes = Vec::from_hex(hex_string).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Invalid hex string: {}", e),
+        )
+    })?;
+
+    Ok(bytes)
 }
