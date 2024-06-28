@@ -2,10 +2,12 @@
 extern crate actix_web;
 
 use actix_cors::Cors;
-use actix_web::{middleware, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
+use crypto::Keys;
 use dotenv::dotenv;
-use std::env;
+use std::{env, sync::Arc};
 
+mod crypto;
 mod handler;
 mod types;
 
@@ -33,8 +35,16 @@ async fn main() -> std::io::Result<()> {
 
     set_env();
 
+    let (secret_key, public_key) = crypto::load_or_generate_keys().unwrap();
+
+    let keys = Arc::new(Keys {
+        secret_key,
+        public_key,
+    });
+
     HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(keys.clone()))
             .wrap(Cors::permissive())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())

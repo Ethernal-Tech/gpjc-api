@@ -1,16 +1,14 @@
-use ed25519_dalek::{PublicKey, Signature, Verifier};
-use hex::FromHex;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{self, Read};
-use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 
-use actix_web::web::Json;
-use actix_web::{post, HttpResponse, Responder};
+use actix_web::web::{self, Json};
+use actix_web::{post, HttpRequest, HttpResponse, Responder};
 use csv::Writer;
 
+use crate::crypto::{self, Keys};
 use crate::types::{ClientStartRequest, Response, ServerStartRequest};
 
 fn get_path(file_name: &str) -> String {
@@ -111,7 +109,10 @@ pub fn start_server() -> Response {
 }
 
 #[post("/api/start-client")]
-pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> impl Responder {
+pub async fn start_client_process(
+    request_data: Json<ClientStartRequest>,
+    data: web::Data<Arc<Keys>>,
+) -> impl Responder {
     tokio::spawn(async move {
         #[allow(unused)]
         let mut resp: Option<Response> = None;
@@ -138,44 +139,25 @@ pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> imp
         #[cfg(feature = "multiple-machines")]
         {
             if let Some(response) = resp {
-                match read_public_key_from_file("pub_key.txt") {
-                    Ok(bytes) => {
-                        println!("Public key in bytes: {:?}", bytes);
-                        let public_key = PublicKey::from_bytes(&bytes).unwrap();
+                let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
+                let signed_msg = response.data.as_str().strip_suffix("\n").unwrap();
+                let mut sig = "".to_string();
 
-                        println!("{:?}", response.data);
-                        // res;signature;signed_msg
-                        let resp_parts: Vec<&str> = response.data.split(";").collect();
+                println!("Signer addr: {:?}", signer_addr);
+                println!("Signed message: {:?}", signed_msg);
 
-                        let signature_bytes = Vec::from_hex(resp_parts[1])
-                            .map_err(|e| {
-                                io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    format!("Invalid hex string: {}", e),
-                                )
-                            })
-                            .unwrap();
-
-                        let signature = Signature::from_bytes(&signature_bytes).unwrap();
-
-                        if public_key
-                            .verify(resp_parts[2].to_string().as_bytes(), &signature)
-                            .is_ok()
-                        {
-                            println!("Signature is valid");
-                        } else {
-                            println!("Signature not valid");
-                        }
+                match crypto::sign_message(&signed_msg, &data.secret_key) {
+                    Ok(signature) => {
+                        println!("Signature: {}", signature);
+                        sig = signature;
                     }
-                    Err(e) => {
-                        eprintln!("Error reading public key: {}", e);
-                    }
+                    Err(e) => println!("Error signing message: {}", e),
                 }
 
                 notify_caller(
-                    request_data.tx_id.clone(),
-                    request_data.policy_id.to_string(),
-                    response.data.to_string(),
+                    request_data.compliance_check_id.clone(),
+                    request_data.policy_id.clone(),
+                    vec![signed_msg, sig.as_str(), signer_addr.as_str()].join(";"),
                 )
                 .await;
             }
@@ -186,7 +168,15 @@ pub async fn start_client_process(request_data: Json<ClientStartRequest>) -> imp
 }
 
 #[post("/api/start-server")]
-pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> impl Responder {
+pub async fn start_server_process(
+    req: HttpRequest,
+    request_data: Json<ServerStartRequest>,
+    data: web::Data<Arc<Keys>>,
+) -> impl Responder {
+    if let Some(val) = req.peer_addr() {
+        println!("Address {:?}", val.ip());
+    };
+
     tokio::spawn(async move {
         let resp = start_server();
         if resp.exit_code != 0 {
@@ -194,44 +184,25 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
             return;
         }
 
-        match read_public_key_from_file("pub_key.txt") {
-            Ok(bytes) => {
-                println!("Public key in bytes: {:?}", bytes);
-                let public_key = PublicKey::from_bytes(&bytes).unwrap();
+        let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
+        let signed_msg = resp.data.as_str().strip_suffix("\n").unwrap();
+        let mut sig = "".to_string();
 
-                println!("{:?}", resp.data);
-                // res;signature;signed_msg
-                let resp_parts: Vec<&str> = resp.data.split(";").collect();
+        println!("Signer addr: {:?}", signer_addr);
+        println!("Signed message: {:?}", signed_msg);
 
-                let signature_bytes = Vec::from_hex(resp_parts[1])
-                    .map_err(|e| {
-                        io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Invalid hex string: {}", e),
-                        )
-                    })
-                    .unwrap();
-
-                let signature = Signature::from_bytes(&signature_bytes).unwrap();
-
-                if public_key
-                    .verify(resp_parts[2].to_string().as_bytes(), &signature)
-                    .is_ok()
-                {
-                    println!("Signature is valid");
-                } else {
-                    println!("Signature not valid");
-                }
+        match crypto::sign_message(&signed_msg, &data.secret_key) {
+            Ok(signature) => {
+                println!("Signature: {}", signature);
+                sig = signature;
             }
-            Err(e) => {
-                eprintln!("Error reading public key: {}", e);
-            }
+            Err(e) => println!("Error signing message: {}", e),
         }
 
         notify_caller(
-            request_data.tx_id.clone(),
+            request_data.compliance_check_id.clone(),
             request_data.policy_id.clone(),
-            resp.data.to_string(),
+            vec![signed_msg, sig.as_str(), signer_addr.as_str()].join(";"),
         )
         .await;
     });
@@ -239,50 +210,18 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
     HttpResponse::Ok()
 }
 
-async fn notify_caller(tx_id: String, policy_id: String, resulting_value: String) {
+async fn notify_caller(compliance_check_id: String, policy_id: String, resulting_value: String) {
     let mut map = HashMap::new();
-    map.insert("TransactionId", tx_id);
-    map.insert("PolicyId", policy_id);
-    map.insert("Value", resulting_value);
+    map.insert("compliance_check_id", compliance_check_id);
+    map.insert("policy_id", policy_id);
+    map.insert("value", resulting_value);
 
     let client = reqwest::Client::new();
-    let api_address = std::env::var("BACKEND_API_ADDRESS")
-        .expect("BACKEND_API_ADDRESS in .env file must be set.");
+    let api_address =
+        std::env::var("GPJC_PUBLISH_ADDR").expect("GPJC_PUBLISH_ADDR in .env file must be set.");
     let _res = client
-        .post(format!("http://{}/api/submitTransactionProof", api_address))
+        .post(format!("http://{}/proof/interactive", api_address))
         .json(&map)
         .send()
         .await;
-}
-
-/// Reads a hex-encoded public key from a .txt file and converts it to bytes.
-///
-/// # Arguments
-///
-/// * `file_path` - A string slice that holds the path to the .txt file.
-///
-/// # Returns
-///
-/// * A Result containing a vector of bytes if successful, or an io::Error.
-fn read_public_key_from_file(file_path: &str) -> Result<Vec<u8>, io::Error> {
-    // Open the file in read-only mode (ignoring errors).
-    let path = Path::new(file_path);
-    let mut file = File::open(&path)?;
-
-    // Read the file contents into a string.
-    let mut hex_string = String::new();
-    file.read_to_string(&mut hex_string)?;
-
-    // Remove any whitespace or newline characters.
-    let hex_string = hex_string.trim();
-
-    // Convert the hex string to bytes.
-    let bytes = Vec::from_hex(hex_string).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("Invalid hex string: {}", e),
-        )
-    })?;
-
-    Ok(bytes)
 }
