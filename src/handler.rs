@@ -5,7 +5,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 use actix_web::web::{self, Json};
-use actix_web::{post, HttpRequest, HttpResponse, Responder};
+use actix_web::{post, HttpResponse, Responder};
 use csv::Writer;
 
 use crate::crypto::{self, Keys};
@@ -33,9 +33,13 @@ fn get_path(file_name: &str) -> String {
     }
 }
 
-fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
+fn create_csv(participants: Vec<String>) -> Result<(), Box<dyn Error>> {
     let mut wtr = Writer::from_path(get_path("UN_test.csv"))?;
-    wtr.write_record(&[receiver, 0.to_string()])?;
+    let mut i = 1;
+    for participant in participants {
+        wtr.write_record(&[participant, i.to_string()])?;
+        i += 1;
+    }
     wtr.flush()?;
     Ok(())
 }
@@ -116,7 +120,7 @@ pub async fn start_client_process(
     tokio::spawn(async move {
         #[allow(unused)]
         let mut resp: Option<Response> = None;
-        match create_csv(request_data.receiver.clone()) {
+        match create_csv(request_data.participants.clone()) {
             Ok(()) => {
                 resp = Some(start_client(request_data.to.clone()));
 
@@ -169,14 +173,9 @@ pub async fn start_client_process(
 
 #[post("/api/start-server")]
 pub async fn start_server_process(
-    req: HttpRequest,
     request_data: Json<ServerStartRequest>,
     data: web::Data<Arc<Keys>>,
 ) -> impl Responder {
-    if let Some(val) = req.peer_addr() {
-        println!("Address {:?}", val.ip());
-    };
-
     tokio::spawn(async move {
         let resp = start_server();
         if resp.exit_code != 0 {

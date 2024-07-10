@@ -10,7 +10,7 @@ pub struct Response {
 pub struct ClientStartRequest {
     pub compliance_check_id: String,
     pub policy_id: String,
-    pub receiver: String,
+    pub participants: Vec<String>,
     pub to: String,
 }
 
