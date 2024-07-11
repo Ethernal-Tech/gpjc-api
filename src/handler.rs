@@ -144,15 +144,11 @@ pub async fn start_client_process(
         {
             if let Some(response) = resp {
                 let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
-                let signed_msg = response.data.as_str().strip_suffix("\n").unwrap();
+                let signed_msg = response.data.as_str();
                 let mut sig = "".to_string();
-
-                println!("Signer addr: {:?}", signer_addr);
-                println!("Signed message: {:?}", signed_msg);
 
                 match crypto::sign_message(&signed_msg, &data.secret_key) {
                     Ok(signature) => {
-                        println!("Signature: {}", signature);
                         sig = signature;
                     }
                     Err(e) => println!("Error signing message: {}", e),
@@ -184,15 +180,11 @@ pub async fn start_server_process(
         }
 
         let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
-        let signed_msg = resp.data.as_str().strip_suffix("\n").unwrap();
+        let signed_msg = resp.data.as_str();
         let mut sig = "".to_string();
-
-        println!("Signer addr: {:?}", signer_addr);
-        println!("Signed message: {:?}", signed_msg);
 
         match crypto::sign_message(&signed_msg, &data.secret_key) {
             Ok(signature) => {
-                println!("Signature: {}", signature);
                 sig = signature;
             }
             Err(e) => println!("Error signing message: {}", e),
@@ -218,9 +210,14 @@ async fn notify_caller(compliance_check_id: String, policy_id: String, resulting
     let client = reqwest::Client::new();
     let api_address =
         std::env::var("GPJC_PUBLISH_ADDR").expect("GPJC_PUBLISH_ADDR in .env file must be set.");
-    let _res = client
+    let res = client
         .post(format!("http://{}/proof/interactive", api_address))
         .json(&map)
         .send()
         .await;
+
+    match res {
+        Ok(_) => println!("Result and signature sent"),
+        Err(e) => println!("Error sending the result: {}", e),
+    }
 }
