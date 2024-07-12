@@ -41,13 +41,21 @@ jobs:
 
         class RequestHandler(BaseHTTPRequestHandler):
             def do_POST(self):
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                print(f"Received POST data: {post_data.decode('utf-8')}")
-                
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b'Received')
+                if self.path == '/proof/interactive':
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length).decode('utf-8')
+                    print(f"Received POST data at /proof/interactive: {post_data}")
+                    
+                    # Log the received data to a file for later checking
+                    with open('mock_api.log', 'a') as log_file:
+                        log_file.write(post_data + '\n')
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "success"}).encode())
+                else:
+                    self.send_error(404, "Not Found")
 
         server = HTTPServer(('localhost', 4000), RequestHandler)
         print('Starting mock API server...')
@@ -81,7 +89,7 @@ jobs:
         curl -X POST -d '{"compliance_check_id": "1", "policy_id": "1", "participants": ["Company A", "Company B"], "to": "0.0.0.0:10501"}' -H "Content-type: application/json" http://localhost:9090/api/start-client
 
     - name: Wait for Rust API to process
-      run: sleep 30
+      run: sleep 120
 
     - name: Check mock API server logs
       run: |
@@ -89,6 +97,7 @@ jobs:
           echo "Validation successful: Received expected result"
         else
           echo "Validation failed: Did not receive expected result"
+          cat mock_api.log  # Print the log content for debugging
           exit 1
         fi
 
