@@ -78,7 +78,7 @@ jobs:
       run: make run &
 
     - name: Wait for servers to start
-      run: sleep 10
+      run: sleep 30
 
     - name: Send start-server request
       run: |
