@@ -144,7 +144,11 @@ pub async fn start_client_process(
         {
             if let Some(response) = resp {
                 let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
-                let signed_msg = response.data.as_str();
+                let signed_msg = vec![
+                    request_data.compliance_check_id.as_str(),
+                    response.data.as_str(),
+                ]
+                .join(",");
                 let mut sig = "".to_string();
 
                 match crypto::sign_message(&signed_msg, &data.secret_key) {
@@ -157,7 +161,7 @@ pub async fn start_client_process(
                 notify_caller(
                     request_data.compliance_check_id.clone(),
                     request_data.policy_id.clone(),
-                    vec![signed_msg, sig.as_str(), signer_addr.as_str()].join(";"),
+                    vec![signed_msg, sig, signer_addr].join(";"),
                 )
                 .await;
             }
@@ -180,7 +184,11 @@ pub async fn start_server_process(
         }
 
         let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
-        let signed_msg = resp.data.as_str();
+        let signed_msg = vec![
+            request_data.compliance_check_id.as_str(),
+            resp.data.as_str(),
+        ]
+        .join(",");
         let mut sig = "".to_string();
 
         match crypto::sign_message(&signed_msg, &data.secret_key) {
@@ -193,7 +201,7 @@ pub async fn start_server_process(
         notify_caller(
             request_data.compliance_check_id.clone(),
             request_data.policy_id.clone(),
-            vec![signed_msg, sig.as_str(), signer_addr.as_str()].join(";"),
+            vec![signed_msg, sig, signer_addr].join(";"),
         )
         .await;
     });
