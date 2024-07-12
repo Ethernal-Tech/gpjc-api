@@ -1,5 +1,4 @@
 use ethsign::SecretKey;
-use hex;
 use secp256k1::rand::rngs::OsRng;
 use secp256k1::Secp256k1;
 use sha3::{Digest, Keccak256};
@@ -67,7 +66,7 @@ pub fn sign_message(
     let mut sig = [0u8; 65];
     sig[0..32].copy_from_slice(&signature.r);
     sig[32..64].copy_from_slice(&signature.s);
-    sig[64] = signature.v as u8 + 27; // Convert to Ethereum's v value
+    sig[64] = signature.v + 27; // Convert to Ethereum's v value
 
     Ok(format!("0x{}", hex::encode(sig)))
 }
