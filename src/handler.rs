@@ -115,7 +115,7 @@ pub fn start_server() -> Response {
 #[post("/api/start-client")]
 pub async fn start_client_process(
     request_data: Json<ClientStartRequest>,
-    data: web::Data<Arc<Keys>>,
+    #[cfg(feature = "multiple-machines")] data: web::Data<Arc<Keys>>,
 ) -> impl Responder {
     tokio::spawn(async move {
         #[allow(unused)]
@@ -124,12 +124,9 @@ pub async fn start_client_process(
             Ok(()) => {
                 resp = Some(start_client(request_data.to.clone()));
 
-                if resp.is_some() {
-                    if resp.as_ref().unwrap().exit_code != 0 {
-                        println!(
-                            "ERROR: GPJC failed with error: {}",
-                            resp.as_ref().unwrap().data
-                        );
+                if let Some(resp) = &resp {
+                    if resp.exit_code != 0 {
+                        println!("ERROR: GPJC failed with error: {}", resp.data);
                     }
                 } else {
                     println!("ERROR: GPJC failed")
@@ -184,7 +181,7 @@ pub async fn start_server_process(
         }
 
         let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
-        let signed_msg = vec![
+        let signed_msg = [
             request_data.compliance_check_id.as_str(),
             resp.data.as_str(),
         ]
@@ -201,7 +198,7 @@ pub async fn start_server_process(
         notify_caller(
             request_data.compliance_check_id.clone(),
             request_data.policy_id.clone(),
-            vec![signed_msg, sig, signer_addr].join(";"),
+            [signed_msg, sig, signer_addr].join(";"),
         )
         .await;
     });
