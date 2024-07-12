@@ -8,28 +8,14 @@ pub struct Response {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ClientStartRequest {
-    pub tx_id: String,
+    pub compliance_check_id: String,
     pub policy_id: String,
-    pub receiver: String,
+    pub participants: Vec<String>,
     pub to: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ServerStartRequest {
-    pub tx_id: String,
+    pub compliance_check_id: String,
     pub policy_id: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProofRequest {
-    pub tx_id: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LogEntry {
-    pub transaction_id: String,
-    pub result: String,
-    pub computation_start: String,
-    pub computation_end: String,
-    pub is_initiator: String,
 }

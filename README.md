@@ -54,9 +54,9 @@ cargo run --bin gpjc-api -- <address>
 To test out methods you can use(be aware of key duplication when running these commands):
 - Start gpjc server:
 ```shell
-curl -X POST -d '{"tx_id": "1", "policy_id": "1"}' -H "Content-type: application/json" http://localhost:9090/api/start-server
+curl -X POST -d '{"compliance_check_id": "1", "policy_id": "1"}' -H "Content-type: application/json" http://localhost:9090/api/start-server
 ```
 - Start gpjc client:
 ```shell
-curl -X POST -d '{"tx_id": "1", "receiver": "M23", "to": "0.0.0.0:10501"}' -H "Content-type: application/json" http://localhost:9090/api/start-client
+curl -X POST -d '{"compliance_check_id": "1", "policy_id": "1", "participants": ["Comapny A", "Comapny B"], "to": "0.0.0.0:10501"}' -H "Content-type: application/json" http://localhost:9090/api/start-client
 ```

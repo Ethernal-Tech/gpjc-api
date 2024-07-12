@@ -3,9 +3,11 @@ extern crate actix_web;
 
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
+use crypto::Keys;
 use dotenv::dotenv;
-use std::env;
+use std::{env, sync::Arc};
 
+mod crypto;
 mod handler;
 mod types;
 
@@ -19,17 +21,6 @@ fn set_env() {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    #[allow(unused)]
-    let mut mssql_password = "".to_string();
-
-    #[cfg(target_os = "linux")]
-    {
-        if args.len() != 3 {
-            println!("Command line argument missing: Expected <address> and <mssql-password>");
-            return Ok(());
-        }
-        mssql_password = args[2].clone();
-    }
 
     if args.len() < 2 {
         println!("Command line argument missing: Address for running the gpjc server is missing, 
@@ -44,9 +35,16 @@ async fn main() -> std::io::Result<()> {
 
     set_env();
 
+    let (secret_key, public_key) = crypto::load_or_generate_keys().unwrap();
+
+    let keys = Arc::new(Keys {
+        secret_key,
+        public_key,
+    });
+
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(mssql_password.clone()))
+            .app_data(web::Data::new(keys.clone()))
             .wrap(Cors::permissive())
             // enable logger - always register actix-web Logger middleware last
             .wrap(middleware::Logger::default())

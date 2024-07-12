@@ -2,12 +2,13 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{self, File};
 use std::process::Command;
-use std::str::FromStr;
+use std::sync::Arc;
 
 use actix_web::web::{self, Json};
 use actix_web::{post, HttpResponse, Responder};
 use csv::Writer;
 
+use crate::crypto::{self, Keys};
 use crate::types::{ClientStartRequest, Response, ServerStartRequest};
 
 fn get_path(file_name: &str) -> String {
@@ -32,19 +33,19 @@ fn get_path(file_name: &str) -> String {
     }
 }
 
-fn create_csv(receiver: String) -> Result<(), Box<dyn Error>> {
+fn create_csv(participants: Vec<String>) -> Result<(), Box<dyn Error>> {
     let mut wtr = Writer::from_path(get_path("UN_test.csv"))?;
-    wtr.write_record(&[receiver, 0.to_string()])?;
+    let mut i = 1;
+    for participant in participants {
+        wtr.write_record(&[participant, i.to_string()])?;
+        i += 1;
+    }
     wtr.flush()?;
     Ok(())
 }
 
 #[allow(unused)]
-pub fn start_client(
-    mssql_password: web::Data<String>,
-    transaction_id: i32,
-    destination_address: String,
-) -> Response {
+pub fn start_client(destination_address: String) -> Response {
     let client_csv_path = get_path("UN_test.csv");
 
     let output = Command::new("bazel-bin/private_join_and_compute/client")
@@ -113,19 +114,15 @@ pub fn start_server() -> Response {
 
 #[post("/api/start-client")]
 pub async fn start_client_process(
-    mssql_password: web::Data<String>,
     request_data: Json<ClientStartRequest>,
+    data: web::Data<Arc<Keys>>,
 ) -> impl Responder {
     tokio::spawn(async move {
         #[allow(unused)]
         let mut resp: Option<Response> = None;
-        match create_csv(request_data.receiver.clone()) {
+        match create_csv(request_data.participants.clone()) {
             Ok(()) => {
-                resp = Some(start_client(
-                    mssql_password,
-                    FromStr::from_str(request_data.tx_id.as_str()).unwrap(),
-                    request_data.to.clone(),
-                ));
+                resp = Some(start_client(request_data.to.clone()));
 
                 if resp.is_some() {
                     if resp.as_ref().unwrap().exit_code != 0 {
@@ -146,11 +143,25 @@ pub async fn start_client_process(
         #[cfg(feature = "multiple-machines")]
         {
             if let Some(response) = resp {
-                let sliced_text: Vec<&str> = response.data.split(',').collect();
+                let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
+                let signed_msg = vec![
+                    request_data.compliance_check_id.as_str(),
+                    response.data.as_str(),
+                ]
+                .join(",");
+                let mut sig = "".to_string();
+
+                match crypto::sign_message(&signed_msg, &data.secret_key) {
+                    Ok(signature) => {
+                        sig = signature;
+                    }
+                    Err(e) => println!("Error signing message: {}", e),
+                }
+
                 notify_caller(
-                    request_data.tx_id.clone(),
-                    request_data.policy_id.to_string(),
-                    sliced_text[0].to_string(),
+                    request_data.compliance_check_id.clone(),
+                    request_data.policy_id.clone(),
+                    vec![signed_msg, sig, signer_addr].join(";"),
                 )
                 .await;
             }
@@ -161,7 +172,10 @@ pub async fn start_client_process(
 }
 
 #[post("/api/start-server")]
-pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> impl Responder {
+pub async fn start_server_process(
+    request_data: Json<ServerStartRequest>,
+    data: web::Data<Arc<Keys>>,
+) -> impl Responder {
     tokio::spawn(async move {
         let resp = start_server();
         if resp.exit_code != 0 {
@@ -169,11 +183,25 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
             return;
         }
 
-        let sliced_text: Vec<&str> = resp.data.split(',').collect();
+        let signer_addr = crypto::public_key_to_address(data.public_key.as_str()).unwrap();
+        let signed_msg = vec![
+            request_data.compliance_check_id.as_str(),
+            resp.data.as_str(),
+        ]
+        .join(",");
+        let mut sig = "".to_string();
+
+        match crypto::sign_message(&signed_msg, &data.secret_key) {
+            Ok(signature) => {
+                sig = signature;
+            }
+            Err(e) => println!("Error signing message: {}", e),
+        }
+
         notify_caller(
-            request_data.tx_id.clone(),
+            request_data.compliance_check_id.clone(),
             request_data.policy_id.clone(),
-            sliced_text[0].to_string(),
+            vec![signed_msg, sig, signer_addr].join(";"),
         )
         .await;
     });
@@ -181,18 +209,23 @@ pub async fn start_server_process(request_data: Json<ServerStartRequest>) -> imp
     HttpResponse::Ok()
 }
 
-async fn notify_caller(tx_id: String, policy_id: String, resulting_value: String) {
+async fn notify_caller(compliance_check_id: String, policy_id: String, resulting_value: String) {
     let mut map = HashMap::new();
-    map.insert("TransactionId", tx_id);
-    map.insert("PolicyId", policy_id);
-    map.insert("Value", resulting_value);
+    map.insert("compliance_check_id", compliance_check_id);
+    map.insert("policy_id", policy_id);
+    map.insert("value", resulting_value);
 
     let client = reqwest::Client::new();
-    let api_address = std::env::var("BACKEND_API_ADDRESS")
-        .expect("BACKEND_API_ADDRESS in .env file must be set.");
-    let _res = client
-        .post(format!("http://{}/api/submitTransactionProof", api_address))
+    let api_address =
+        std::env::var("GPJC_PUBLISH_ADDR").expect("GPJC_PUBLISH_ADDR in .env file must be set.");
+    let res = client
+        .post(format!("http://{}/proof/interactive", api_address))
         .json(&map)
         .send()
         .await;
+
+    match res {
+        Ok(_) => println!("Result and signature sent"),
+        Err(e) => println!("Error sending the result: {}", e),
+    }
 }

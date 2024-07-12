@@ -1,0 +1,107 @@
+name: Rust API Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Install Bazel
+      run: |
+        sudo apt-get update && sudo apt-get install -y curl gnupg
+        curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg
+        sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+        echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+        sudo apt-get update && sudo apt-get install -y bazel
+
+    - name: Build Bazel project
+      working-directory: ./private-join-and-compute
+      run: make build
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Create mock API server
+      run: |
+        cat << EOF > mock_api.py
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
+
+        class RequestHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path == '/proof/interactive':
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length).decode('utf-8')
+                    print(f"Received POST data at /proof/interactive: {post_data}")
+                    
+                    # Log the received data to a file for later checking
+                    with open('mock_api.log', 'a') as log_file:
+                        log_file.write(post_data + '\n')
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "success"}).encode())
+                else:
+                    self.send_error(404, "Not Found")
+
+        server = HTTPServer(('localhost', 4000), RequestHandler)
+        print('Starting mock API server...')
+        server.serve_forever()
+        EOF
+
+    - name: Start mock API server
+      run: python mock_api.py &
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+
+    - name: Build Rust API
+      run: cargo build --release --bin gpjc-api
+
+    - name: Run Rust API
+      run: ./target/release/gpjc-api localhost &
+
+    - name: Wait for servers to start
+      run: sleep 30
+
+    - name: Send start-server request
+      run: |
+        curl -X POST -d '{"compliance_check_id": "1", "policy_id": "1"}' -H "Content-type: application/json" http://localhost:9090/api/start-server
+
+    - name: Send start-client request
+      run: |
+        curl -X POST -d '{"compliance_check_id": "1", "policy_id": "1", "participants": ["Company A", "Company B"], "to": "0.0.0.0:10501"}' -H "Content-type: application/json" http://localhost:9090/api/start-client
+
+    - name: Wait for Rust API to process
+      run: sleep 120
+
+    - name: Check mock API server logs
+      run: |
+        if grep -q '1,0,' mock_api.log; then
+          echo "Validation successful: Received expected result"
+        else
+          echo "Validation failed: Did not receive expected result"
+          cat mock_api.log  # Print the log content for debugging
+          exit 1
+        fi
+
+    - name: Stop servers
+      run: |
+        pkill -f "python mock_api.py" || true
+        pkill -f "gpjc-api" || true

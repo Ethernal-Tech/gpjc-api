@@ -1,7 +1,4 @@
-run-linux:
-	cargo run --bin gpjc-api -- localhost
-
-run-windows:
+run:
 	cargo run --bin gpjc-api -- localhost
 
 build:
