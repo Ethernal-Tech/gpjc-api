@@ -72,10 +72,10 @@ jobs:
         toolchain: stable
 
     - name: Build Rust API
-      run: cargo build --release
+      run: cargo build --release --bin gpjc-api
 
     - name: Run Rust API
-      run: cargo run --release &
+      run: make run &
 
     - name: Wait for servers to start
       run: sleep 10
