@@ -26,7 +26,7 @@ jobs:
 
     - name: Build Bazel project
       working-directory: ./private-join-and-compute
-      run: bazel build //...
+      run: make build
 
     - name: Set up Python
       uses: actions/setup-python@v4
