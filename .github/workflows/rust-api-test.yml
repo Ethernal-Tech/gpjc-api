@@ -75,7 +75,7 @@ jobs:
       run: cargo build --release --bin gpjc-api
 
     - name: Run Rust API
-      run: cargo run --bin gpjc-api -- localhost &
+      run: ./target/release/gpjc-api localhost &
 
     - name: Wait for servers to start
       run: sleep 30
