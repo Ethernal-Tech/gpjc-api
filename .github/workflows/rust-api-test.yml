@@ -3,7 +3,7 @@ name: Rust API Test
 on:
   workflow_dispatch:
   push:
-    branches: [ signature-test ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -103,5 +103,5 @@ jobs:
 
     - name: Stop servers
       run: |
-        pkill -f "python mock_api.py"
-        pkill -f "cargo run"
+        pkill -f "python mock_api.py" || true
+        pkill -f "gpjc-api" || true
